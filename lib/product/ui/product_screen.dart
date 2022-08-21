@@ -5,6 +5,8 @@ import 'package:sample_app/product/data/product_memory_data_source.dart';
 import 'package:sample_app/product/data/product_repository.dart';
 import 'package:sample_app/product/ui/product_bloc.dart';
 
+import '../data/product.dart';
+
 class ProductScreen extends StatefulWidget {
   static String routeName = 'product';
 
@@ -19,7 +21,7 @@ class _ProductScreenState extends State<ProductScreen> with SingleTickerProvider
   double expandedHeight = 400;
   bool shouldShowForm = false;
   OrderButtonState buttonState = OrderButtonState.collapsed;
-  late final bloc = ProductBloc(ProductRepository(ProductMemoryDataSource())); // TODO: Improve Dependency Injection
+  final bloc = ProductBloc(id: '123', productRepository: ProductRepository(ProductMemoryDataSource())); // TODO: Improve Dependency Injection
 
   @override
   Widget build(BuildContext context) {
@@ -35,10 +37,17 @@ class _ProductScreenState extends State<ProductScreen> with SingleTickerProvider
                       (BuildContext context, double height, Widget? child) {
                     return _ProductAppBar(height: height);
                   }),
-              const SliverToBoxAdapter(
+              SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 32),
-                  child: _ProductDescription(),
+                  padding: const EdgeInsets.only(top: 32, left: 32, right: 32),
+                  child: BlocBuilder<ProductBloc, ProductState>(
+                    bloc: bloc,
+                    builder: (context, state) {
+                      return state.maybeWhen(
+                          loaded: (product) => _ProductDescription(product: product),
+                          orElse: () => const Center(child: CircularProgressIndicator()));
+                    },
+                  ),
                 ),
               ),
               SliverToBoxAdapter(
@@ -61,8 +70,7 @@ class _ProductScreenState extends State<ProductScreen> with SingleTickerProvider
             child: BlocBuilder<ProductBloc, ProductState>(
               bloc: bloc,
               builder: (context, state) {
-                if (state is! LoadingProductState) {
-                  // TODO: REMOVE THE !
+                if (state is LoadingProductState) {
                   return const SizedBox.shrink();
                 }
 
@@ -70,19 +78,15 @@ class _ProductScreenState extends State<ProductScreen> with SingleTickerProvider
                   text: buttonState == OrderButtonState.collapsed
                       ? 'CUSTOMIZE YOUR DRINK'
                       : 'ADD TO ORDER',
-                  onPressed: !state.canAddOrder // TODO: REMOVE THE !
-                      ? () {
-                          setState(() {
-                            buttonState = buttonState == OrderButtonState.expanded
-                                    ? OrderButtonState.collapsed
-                                    : OrderButtonState.expanded;
-                            shouldShowForm = buttonState == OrderButtonState.expanded;
-                            expandedHeight = buttonState == OrderButtonState.expanded
-                                    ? 200
-                                    : 400;
-                          });
-                        }
-                      : null,
+                  onPressed: () {
+                    setState(() {
+                      buttonState = buttonState == OrderButtonState.expanded
+                          ? OrderButtonState.collapsed
+                          : OrderButtonState.expanded;
+                      shouldShowForm = buttonState == OrderButtonState.expanded;
+                      expandedHeight = buttonState == OrderButtonState.expanded ? 200 : 400;
+                    });
+                  },
                   buttonState: buttonState,
                 );
               },
@@ -97,21 +101,23 @@ class _ProductScreenState extends State<ProductScreen> with SingleTickerProvider
 class _ProductDescription extends StatelessWidget {
   const _ProductDescription({
     Key? key,
+    required this.product,
   }) : super(key: key);
+
+  final Product product; // TODO: Change the Model for a UI model
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: const <Widget>[
-        SizedBox(height: 32),
+      children: <Widget>[
         Text(
-          'Vanilla Sweet Cream Cold Brew',
-          style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Color(0xFF223730)),
+          product.name,
+          style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Color(0xFF223730)),
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         Text(
-          'Our slow-stepped custom blend coffee accented with vanilla and topped with a delicate float of house-made vanilla sweet cream that cascades throughout the cup.',
-          style: TextStyle(fontSize: 14, color: Colors.grey),
+          product.description,
+          style: const TextStyle(fontSize: 14, color: Colors.grey),
         ),
       ],
     );

@@ -1,7 +1,7 @@
 import 'product.dart';
 
 class ProductMemoryDataSource {
-  Product getById(String id) {
+  Future<Product> getById(String id) async {
     return Product(
         id: id,
         name: 'Vanilla Sweet Cream Cold Brew',

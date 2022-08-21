@@ -6,5 +6,5 @@ class ProductRepository {
 
   final ProductMemoryDataSource memoryDataSource;
 
-  Product getById(String id) => memoryDataSource.getById(id);
+  Future<Product> getById(String id) => memoryDataSource.getById(id);
 }
