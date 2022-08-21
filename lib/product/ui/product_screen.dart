@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:sample_app/product/data/product_memory_data_source.dart';
+import 'package:sample_app/product/data/product_repository.dart';
+import 'package:sample_app/product/ui/product_bloc.dart';
 
 class ProductScreen extends StatefulWidget {
   static String routeName = 'product';
@@ -14,8 +17,7 @@ class _ProductScreenState extends State<ProductScreen> with SingleTickerProvider
   double opacity = 0;
   double expandedHeight = 400;
   bool shouldShowForm = false;
-  bool test = false;
-  late final animationController = AnimationController(vsync: this);
+  late final bloc = ProductBloc(ProductRepository(ProductMemoryDataSource())); // TODO: Improve Dependency Injection
 
   @override
   void dispose() {
