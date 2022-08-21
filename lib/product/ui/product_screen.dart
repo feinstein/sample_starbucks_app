@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sample_app/product/data/product_memory_data_source.dart';
 import 'package:sample_app/product/data/product_repository.dart';
 import 'package:sample_app/product/ui/product_bloc.dart';
@@ -17,66 +18,77 @@ class _ProductScreenState extends State<ProductScreen> with SingleTickerProvider
   double opacity = 0;
   double expandedHeight = 400;
   bool shouldShowForm = false;
+  OrderButtonState buttonState = OrderButtonState.collapsed;
   late final bloc = ProductBloc(ProductRepository(ProductMemoryDataSource())); // TODO: Improve Dependency Injection
 
   @override
-  void dispose() {
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: Theme.of(context).copyWith(platform: TargetPlatform.iOS),
-      child: Scaffold(
-        body: Stack(
-          children: [
-            CustomScrollView(
-              slivers: [
-                TweenAnimationBuilder(
-                    tween: Tween<double>(begin: 400, end: expandedHeight),
-                    duration: const Duration(milliseconds: 300),
-                    builder: (BuildContext context, double height, Widget? child) {
-                      return _ProductAppBar(height: height);
-                    }
+    return Scaffold(
+      body: Stack(
+        children: [
+          CustomScrollView(
+            slivers: [
+              TweenAnimationBuilder(
+                  tween: Tween<double>(begin: 400, end: expandedHeight),
+                  duration: const Duration(milliseconds: 300),
+                  builder:
+                      (BuildContext context, double height, Widget? child) {
+                    return _ProductAppBar(height: height);
+                  }),
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 32),
+                  child: _ProductDescription(),
                 ),
-                const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 32),
-                    child: _ProductDescription(),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    child: shouldShowForm
-                        ? const Padding(
-                            padding: EdgeInsets.all(32),
-                            child: OrderForm(),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-                ),
-              ],
-            ),
-            Positioned.directional(
-              textDirection: Directionality.of(context),
-              bottom: 0,
-              end: 0,
-              child: OrderButton(
-                onPressed: () {},
-                onStateChange: (buttonState) {
-                  setState(
-                    () {
-                      shouldShowForm = buttonState == OrderButtonState.expanded;
-                      expandedHeight = buttonState == OrderButtonState.expanded ? 200 : 400;
-                    },
-                  );
-                },
               ),
+              SliverToBoxAdapter(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: shouldShowForm
+                      ? const Padding(
+                          padding: EdgeInsets.all(32),
+                          child: OrderForm(),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
+            ],
+          ),
+          Positioned.directional(
+            textDirection: Directionality.of(context),
+            bottom: 0,
+            end: 0,
+            child: BlocBuilder<ProductBloc, ProductState>(
+              bloc: bloc,
+              builder: (context, state) {
+                if (state is! LoadingProductState) {
+                  // TODO: REMOVE THE !
+                  return const SizedBox.shrink();
+                }
+
+                return OrderButton(
+                  text: buttonState == OrderButtonState.collapsed
+                      ? 'CUSTOMIZE YOUR DRINK'
+                      : 'ADD TO ORDER',
+                  onPressed: !state.canAddOrder // TODO: REMOVE THE !
+                      ? () {
+                          setState(() {
+                            buttonState = buttonState == OrderButtonState.expanded
+                                    ? OrderButtonState.collapsed
+                                    : OrderButtonState.expanded;
+                            shouldShowForm = buttonState == OrderButtonState.expanded;
+                            expandedHeight = buttonState == OrderButtonState.expanded
+                                    ? 200
+                                    : 400;
+                          });
+                        }
+                      : null,
+                  buttonState: buttonState,
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -115,7 +127,6 @@ class _ProductAppBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return SliverAppBar(
       systemOverlayStyle: const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
-      leading: const BackButton(),
       title: const Text('STARBUCKS'),
       backgroundColor: const Color(0xFF1E3932),
       flexibleSpace: Image.asset(
@@ -297,38 +308,45 @@ typedef OrderButtonStateCallback = void Function(OrderButtonState state);
 class OrderButton extends StatefulWidget {
   const OrderButton({
     Key? key,
+    required this.text,
+    required this.buttonState,
     this.onPressed,
-    this.onStateChange,
   }) : super(key: key);
 
   final VoidCallback? onPressed;
-  final OrderButtonStateCallback? onStateChange;
+  final OrderButtonState buttonState;
+  final String text;
 
   @override
   State<OrderButton> createState() => _OrderButtonState();
 }
 
 class _OrderButtonState extends State<OrderButton> with TickerProviderStateMixin {
-  bool isExpanded = false;
-  late final _sizeController = AnimationController(
-    duration: const Duration(milliseconds: 200),
-    vsync: this,
-  );
+  // TODO: Improve color and Theme configurations
+  static const _textColor = Color(0xFF296146);
+  static const _backgroundColor = Color(0xFFE3F5EE);
+  static const _tapBackgroundColor = Color(0xFFD8E9E3);
 
-  late final _tapController = AnimationController(
-    duration: const Duration(milliseconds: 50),
-    vsync: this,
-  );
+  late final _sizeController = AnimationController(duration: const Duration(milliseconds: 200), vsync: this);
+  late final _tapController = AnimationController(duration: const Duration(milliseconds: 50), vsync: this);
+  late final _tapAnimation = ColorTween(begin: _tapBackgroundColor, end: _backgroundColor).animate(_tapController);
 
-  late final _tapAnimation = ColorTween(begin: const Color(0xFFD8E9E3), end: const Color(0xFFE3F5EE)).animate(_tapController);
+  @visibleForTesting
+  bool get isEnabled => widget.onPressed != null;
 
-  void toggleSizeAnimation() {
-    if (_sizeController.status == AnimationStatus.dismissed ||
-        _sizeController.status == AnimationStatus.reverse) {
+  void _animateShape() {
+    if (widget.buttonState == OrderButtonState.expanded) {
       _sizeController.forward();
-    } else if (_sizeController.status == AnimationStatus.completed ||
-        _sizeController.status == AnimationStatus.forward) {
+    } else {
       _sizeController.reverse();
+    }
+  }
+
+  @override
+  void didUpdateWidget(OrderButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.buttonState != widget.buttonState) {
+      _animateShape();
     }
   }
 
@@ -344,14 +362,7 @@ class _OrderButtonState extends State<OrderButton> with TickerProviderStateMixin
 
     return GestureDetector(
       onTapDown: (details) => _tapController.forward(),
-      onTap: () {
-        widget.onPressed?.call();
-        toggleSizeAnimation();
-        setState(() {
-          isExpanded = !isExpanded;
-        });
-        widget.onStateChange?.call(isExpanded ? OrderButtonState.expanded : OrderButtonState.collapsed);
-      },
+      onTap: widget.onPressed,
       onTapUp: (details) => _tapController.reverse(),
       child: AnimatedBuilder(
         animation: _tapAnimation,
@@ -376,9 +387,9 @@ class _OrderButtonState extends State<OrderButton> with TickerProviderStateMixin
                 },
               ),
               Text(
-                isExpanded ? 'ADD TO ORDER' : 'CUSTOMIZE YOUR DRINK',
+                widget.text,
                 style: TextStyle(
-                    color: const Color(0xFF296146).withOpacity(
+                    color: _textColor.withOpacity(
                       Tween<double>(begin: 1, end: 0.7).evaluate(_tapController),
                     ),
                     fontSize: 14,

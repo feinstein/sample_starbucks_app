@@ -7,7 +7,7 @@ import '../data/product.dart';
 part 'product_bloc.freezed.dart';
 
 class ProductBloc extends Bloc<ProductEvent, ProductState> {
-  ProductBloc(this.productRepository) : super (const ProductState._loading()) {
+  ProductBloc(this.productRepository) : super (const ProductState.loading()) {
     on<LoadProductEvent>(_loadProductById);
   }
 
@@ -26,13 +26,18 @@ class ProductEvent with _$ProductEvent {
 
 // States
 abstract class _ProductState {
-  const _ProductState({required this.canAddOrder});
+  const _ProductState();
 
-  final bool canAddOrder;
+  bool get canAddOrder;
 }
 
 @freezed
-class ProductState extends _ProductState with _$ProductState {
-  const factory ProductState.loading({@Default(false) bool canAddOrder}) = LoadingProductState;
-  const factory ProductState.loaded({required Product product, @Default(true) bool canAddOrder}) = ProductLoadedState;
+class ProductState with _$ProductState implements _ProductState {
+  const ProductState._();
+
+  const factory ProductState.loading() = LoadingProductState;
+  const factory ProductState.loaded({required Product product}) = ProductLoadedState;
+
+  @override
+  bool get canAddOrder => when(loading: () => false, loaded: (product) => true);
 }
