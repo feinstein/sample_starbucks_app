@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'order/ui/order_screen.dart';
+import 'product/ui/product_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -17,49 +17,9 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       routes: {
-        OrderScreen.routeName: (context) => const OrderScreen(),
+        ProductScreen.routeName: (context) => const ProductScreen(),
       },
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  void _incrementCounter() {
-    setState(() {
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            ElevatedButton(
-                onPressed: () => Navigator.pushNamed(context, OrderScreen.routeName),
-                child: const Text('Starbucks Order')),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
+      home: const ProductScreen(),
     );
   }
 }

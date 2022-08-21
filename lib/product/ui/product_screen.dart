@@ -1,27 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-class OrderScreen extends StatefulWidget {
-  static String routeName = 'order';
+class ProductScreen extends StatefulWidget {
+  static String routeName = 'product';
 
-  const OrderScreen({Key? key}) : super(key: key);
+  const ProductScreen({Key? key}) : super(key: key);
 
   @override
-  State<OrderScreen> createState() => _OrderScreenState();
+  State<ProductScreen> createState() => _ProductScreenState();
 }
 
-class _OrderScreenState extends State<OrderScreen> with SingleTickerProviderStateMixin {
-  late final _scrollController = ScrollController();
+class _ProductScreenState extends State<ProductScreen> with SingleTickerProviderStateMixin {
   double opacity = 0;
   double expandedHeight = 400;
+  bool shouldShowForm = false;
   bool test = false;
   late final animationController = AnimationController(vsync: this);
 
   @override
   void dispose() {
-    _scrollController.dispose();
-    final v = ValueNotifier<int>(0);
-    v.addListener(() {print(v.value);});
     super.dispose();
   }
 
@@ -32,107 +29,110 @@ class _OrderScreenState extends State<OrderScreen> with SingleTickerProviderStat
       child: Scaffold(
         body: Stack(
           children: [
-            // ValueListenableBuilder(valueListenable: valueListenable, builder: builder,),
-            NotificationListener<ScrollEndNotification>(
-              onNotification: (scrollNotification) {
-                return true;
-
-                // stack overflow
-                // print('hiii');
-                // final scrollMetrics = scrollNotification.metrics;
-                // setState(() => opacity = (scrollMetrics.pixels / 75).clamp(0, 1));
-                //
-                // double destination = 0;
-                //
-                // if (_scrollController.offset > 32) {
-                //   destination = 75;
-                // }
-                //
-                // _scrollController.animateTo(scrollMetrics.minScrollExtent,
-                //     duration: const Duration(milliseconds: 200),
-                //     curve: Curves.easeIn);
-                //
-                // return true;
-              },
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                controller: _scrollController,
-                scrollBehavior: ScrollBehavior(),
-                slivers: [
-                  TweenAnimationBuilder(
-                      tween: Tween<double>(begin: 400, end: expandedHeight),
-                      duration: const Duration(milliseconds: 300),
-                      builder: (BuildContext context, double height, Widget? child) {
-                        return SliverAppBar(
-                          systemOverlayStyle: const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
-                          leading: const BackButton(),
-                          title: const Text('STARBUCKS'),
-                          backgroundColor: Colors.transparent,
-                          flexibleSpace: ClipRRect(
-                            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
-                            child: ColoredBox(
-                              color: const Color(0xFF1E3932),
-                              child: Image.asset(
-                                'assets/starbucks_coffee.png',
-                                frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(top: 86),
-                                    child: child,
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                          pinned: true,
-                          elevation: 0,
-                          collapsedHeight: height - 100,
-                          expandedHeight: height,
-                        );
-                      }
+            CustomScrollView(
+              slivers: [
+                TweenAnimationBuilder(
+                    tween: Tween<double>(begin: 400, end: expandedHeight),
+                    duration: const Duration(milliseconds: 300),
+                    builder: (BuildContext context, double height, Widget? child) {
+                      return _ProductAppBar(height: height);
+                    }
+                ),
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 32),
+                    child: _ProductDescription(),
                   ),
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    sliver: SliverToBoxAdapter(
-                      child: Column(
-                        children: <Widget>[
-                          const SizedBox(height: 32),
-                          const Text(
-                            'Vanilla Sweet Cream Cold Brew',
-                            style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Color(0xFF223730)),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Our slow-stepped custom blend coffee accented with vanilla and topped with a delicate float of house-made vanilla sweet cream that cascades throughout the cup.',
-                            style: TextStyle(fontSize: 14, color: Colors.grey),
-                          ),
-                          AnimatedOpacity(
-                            opacity: opacity,
-                            duration: const Duration(milliseconds: 200),
-                            child: const OrderForm(),
-                          ),
-                        ],
-                      ),
-                    ),
+                ),
+                SliverToBoxAdapter(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: shouldShowForm
+                        ? const Padding(
+                            padding: EdgeInsets.all(32),
+                            child: OrderForm(),
+                          )
+                        : const SizedBox.shrink(),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
             Positioned.directional(
               textDirection: Directionality.of(context),
               bottom: 0,
               end: 0,
-              child: OrderButton(onPressed: () {},
+              child: OrderButton(
+                onPressed: () {},
                 onStateChange: (buttonState) {
-                  setState(() {
-                    opacity = (opacity - 1).abs();
-                    expandedHeight = expandedHeight == 200 ? 400 : 200;
-                  });
+                  setState(
+                    () {
+                      shouldShowForm = buttonState == OrderButtonState.expanded;
+                      expandedHeight = buttonState == OrderButtonState.expanded ? 200 : 400;
+                    },
+                  );
                 },
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ProductDescription extends StatelessWidget {
+  const _ProductDescription({
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: const <Widget>[
+        SizedBox(height: 32),
+        Text(
+          'Vanilla Sweet Cream Cold Brew',
+          style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Color(0xFF223730)),
+        ),
+        SizedBox(height: 16),
+        Text(
+          'Our slow-stepped custom blend coffee accented with vanilla and topped with a delicate float of house-made vanilla sweet cream that cascades throughout the cup.',
+          style: TextStyle(fontSize: 14, color: Colors.grey),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProductAppBar extends StatelessWidget {
+  const _ProductAppBar({Key? key, required this.height}) : super(key: key);
+
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverAppBar(
+      systemOverlayStyle: const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
+      leading: const BackButton(),
+      title: const Text('STARBUCKS'),
+      backgroundColor: const Color(0xFF1E3932),
+      flexibleSpace: Image.asset(
+          'assets/starbucks_coffee.png',
+          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 86),
+              child: child,
+            );
+          },
+        ),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+      ),
+      pinned: true,
+      elevation: 0,
+      scrolledUnderElevation: 8,
+      collapsedHeight: 150,
+      expandedHeight: height,
     );
   }
 }
@@ -147,10 +147,10 @@ class OrderForm extends StatelessWidget {
         DropDownButtonFormItem(
           title: 'Milk',
           items: const [
-            DropdownMenuItem(child: Text('Soymilk'), value: 'Soymilk'),
-            DropdownMenuItem(child: Text('Normal'), value: 'Normal'),
-            DropdownMenuItem(child: Text('Almond'), value: 'Almond'),
-            DropdownMenuItem(child: Text('Integral'), value: 'Integral'),
+            DropdownMenuItem(value: 'Soymilk', child: Text('Soymilk')),
+            DropdownMenuItem(value: 'Normal', child: Text('Normal')),
+            DropdownMenuItem(value: 'Almond', child: Text('Almond')),
+            DropdownMenuItem(value: 'Integral', child: Text('Integral')),
           ],
           onChanged: (_) {},
           value: 'Soymilk',
@@ -159,9 +159,9 @@ class OrderForm extends StatelessWidget {
         DropDownButtonFormItem(
           title: 'Toppings',
           items: const [
-            DropdownMenuItem(child: Text('Vanilla Syrup'), value: 'Vanilla Syrup'),
-            DropdownMenuItem(child: Text('Chocolate'), value: 'Chocolate'),
-            DropdownMenuItem(child: Text('Cream'), value: 'Cream'),
+            DropdownMenuItem(value: 'Vanilla Syrup', child: Text('Vanilla Syrup')),
+            DropdownMenuItem(value: 'Chocolate', child: Text('Chocolate')),
+            DropdownMenuItem(value: 'Cream', child: Text('Cream')),
           ],
           onChanged: (_) {},
           value: 'Vanilla Syrup',
@@ -220,12 +220,12 @@ class CardFormItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 8),
         child: child,
       ),
-      elevation: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
     );
   }
 }
