@@ -16,6 +16,8 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   }) : super(const ProductState.loading()) {
     on<LoadProductEvent>(_loadProductById);
     on<ProductCustomizationChangeEvent>(_productCustomizationChanged);
+    on<OrderQuantityDecrementEvent>(_orderQuantityDecrement);
+    on<OrderQuantityIncrementEvent>(_orderQuantityIncrement);
 
     add(ProductEvent.load(id: id));
   }
@@ -30,6 +32,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     final product = await productRepository.getById(id);
     final order = Order(
       productId: product.id,
+      quantity: 1,
       customizations: product.customizations.map(
         (customization) {
           return OrderProductCustomization(
@@ -64,6 +67,30 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
 
     emit(ProductState(product: state.product, order: newOrder));
   }
+
+  void _orderQuantityDecrement(OrderQuantityDecrementEvent event, Emitter<ProductState> emit) async {
+    final state = this.state;
+    if (state is! DefaultProductState) {
+      return;
+    }
+
+    int currentQuantity = state.order.quantity;
+    if (currentQuantity - 1 > 0) {
+      final newOrder = state.order.copyWith(quantity: currentQuantity - 1);
+      emit(ProductState(product: state.product, order: newOrder));
+    }
+  }
+
+  void _orderQuantityIncrement(OrderQuantityIncrementEvent event, Emitter<ProductState> emit) async {
+    final state = this.state;
+    if (state is! DefaultProductState) {
+      return;
+    }
+
+    int currentQuantity = state.order.quantity;
+    final newOrder = state.order.copyWith(quantity: currentQuantity + 1);
+    emit(ProductState(product: state.product, order: newOrder));
+  }
 }
 
 // Events
@@ -75,6 +102,9 @@ class ProductEvent with _$ProductEvent {
     required String customizationId,
     required String newCustomizationValue,
   }) = ProductCustomizationChangeEvent;
+
+  const factory ProductEvent.orderQuantityDecrement() = OrderQuantityDecrementEvent;
+  const factory ProductEvent.orderQuantityIncrement() = OrderQuantityIncrementEvent;
 }
 
 // States

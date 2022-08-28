@@ -8,6 +8,7 @@ class Order with _$Order {
   const factory Order({
     required String productId,
     required List<OrderProductCustomization> customizations,
+    required int quantity,
   }) = _Order;
 
   const Order._();

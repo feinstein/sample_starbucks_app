@@ -208,15 +208,19 @@ class OrderFormSliver extends StatelessWidget {
                 },
               ),
             ),
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.only(top: 16, bottom: 64),
-                child: CounterFormItem(),
+                padding: const EdgeInsets.only(top: 16, bottom: 130),//64),
+                child: CounterFormItem(
+                  count: state.order.quantity,
+                  onDecrement: () => bloc.add(const ProductEvent.orderQuantityDecrement()),
+                  onIncrement: () => bloc.add(const ProductEvent.orderQuantityIncrement()),
+                ),
               ),
             )
           ],
         );
-      }
+      },
     );
   }
 }
@@ -278,14 +282,17 @@ class CardFormItem extends StatelessWidget {
 }
 
 class CounterFormItem extends StatefulWidget {
-  const CounterFormItem({Key? key}) : super(key: key);
+  const CounterFormItem({Key? key, required this.count, this.onIncrement, this.onDecrement}) : super(key: key);
+
+  final int count;
+  final VoidCallback? onIncrement;
+  final VoidCallback? onDecrement;
 
   @override
   State<CounterFormItem> createState() => _CounterFormItemState();
 }
 
 class _CounterFormItemState extends State<CounterFormItem> {
-  int _count = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -293,9 +300,9 @@ class _CounterFormItemState extends State<CounterFormItem> {
       offset: const Offset(-12, 0),
       child: Row(
         children: <Widget>[
-          _SquareElevatedButton(onPressed: () => setState(() => _count--), child: const Text('-',)),
-          Text('$_count', style: const TextStyle(fontSize: 24),),
-          _SquareElevatedButton(onPressed: () => setState(() => _count++), child: const Text('+')),
+          _SquareElevatedButton(onPressed: () => setState(() => widget.onDecrement?.call()), child: const Text('-')),
+          Text('${widget.count}', style: const TextStyle(fontSize: 24),),
+          _SquareElevatedButton(onPressed: () => setState(() => widget.onIncrement?.call()), child: const Text('+')),
         ],
       ),
     );
