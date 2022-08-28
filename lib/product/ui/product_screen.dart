@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:sample_app/product/data/product_memory_data_source.dart';
-import 'package:sample_app/product/data/product_repository.dart';
+import 'package:sample_app/product/data/memory/product_memory_data_source.dart';
+import 'package:sample_app/product/data/repository/product_repository.dart';
 import 'package:sample_app/product/ui/product_bloc.dart';
+import 'package:sliver_tools/sliver_tools.dart';
 
-import '../data/product.dart';
+import '../data/model/product.dart';
 
 class ProductScreen extends StatefulWidget {
   static String routeName = 'product';
@@ -26,74 +27,62 @@ class _ProductScreenState extends State<ProductScreen> with SingleTickerProvider
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          CustomScrollView(
-            slivers: [
-              TweenAnimationBuilder(
-                  tween: Tween<double>(begin: 400, end: expandedHeight),
-                  duration: const Duration(milliseconds: 300),
-                  builder:
-                      (BuildContext context, double height, Widget? child) {
-                    return _ProductAppBar(height: height);
-                  }),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 32, left: 32, right: 32),
-                  child: BlocBuilder<ProductBloc, ProductState>(
-                    bloc: bloc,
-                    builder: (context, state) {
-                      return state.maybeWhen(
+      body: BlocBuilder<ProductBloc, ProductState>(
+          bloc: bloc,
+          builder: (context, state) {
+            return Stack(
+              children: [
+                CustomScrollView(
+                  slivers: [
+                    TweenAnimationBuilder(
+                      tween: Tween<double>(begin: 400, end: expandedHeight),
+                      duration: const Duration(milliseconds: 300),
+                      builder: (BuildContext context, double height, Widget? child) {
+                        return _ProductAppBar(height: height);
+                      },
+                    ),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 32, left: 32, right: 32),
+                        child: state.maybeWhen(
                           loaded: (product) => _ProductDescription(product: product),
-                          orElse: () => const Center(child: CircularProgressIndicator()));
-                    },
-                  ),
+                          orElse: () => const Center(child: CircularProgressIndicator()),
+                        ),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      sliver: SliverAnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          child: shouldShowForm && state is ProductLoadedState
+                              ? OrderFormSliver(product: state.product)
+                              : const SliverToBoxAdapter(
+                                  child: SizedBox.shrink(),
+                                )),
+                    ),
+                  ],
                 ),
-              ),
-              SliverToBoxAdapter(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: shouldShowForm
-                      ? const Padding(
-                          padding: EdgeInsets.all(32),
-                          child: OrderForm(),
-                        )
-                      : const SizedBox.shrink(),
+                Positioned.directional(
+                  textDirection: Directionality.of(context),
+                  bottom: 0,
+                  end: 0,
+                  child: state is LoadingProductState
+                      ? const SizedBox.shrink()
+                      : OrderButton(
+                          text: buttonState == OrderButtonState.collapsed ? 'CUSTOMIZE YOUR DRINK' : 'ADD TO ORDER',
+                          onPressed: () {
+                            setState(() {
+                              buttonState = buttonState == OrderButtonState.expanded ? OrderButtonState.collapsed : OrderButtonState.expanded;
+                              shouldShowForm = buttonState == OrderButtonState.expanded;
+                              expandedHeight = buttonState == OrderButtonState.expanded ? 200 : 400;
+                            });
+                          },
+                          buttonState: buttonState,
+                        ),
                 ),
-              ),
-            ],
-          ),
-          Positioned.directional(
-            textDirection: Directionality.of(context),
-            bottom: 0,
-            end: 0,
-            child: BlocBuilder<ProductBloc, ProductState>(
-              bloc: bloc,
-              builder: (context, state) {
-                if (state is LoadingProductState) {
-                  return const SizedBox.shrink();
-                }
-
-                return OrderButton(
-                  text: buttonState == OrderButtonState.collapsed
-                      ? 'CUSTOMIZE YOUR DRINK'
-                      : 'ADD TO ORDER',
-                  onPressed: () {
-                    setState(() {
-                      buttonState = buttonState == OrderButtonState.expanded
-                          ? OrderButtonState.collapsed
-                          : OrderButtonState.expanded;
-                      shouldShowForm = buttonState == OrderButtonState.expanded;
-                      expandedHeight = buttonState == OrderButtonState.expanded ? 200 : 400;
-                    });
-                  },
-                  buttonState: buttonState,
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+              ],
+            );
+          }),
     );
   }
 }
@@ -156,38 +145,57 @@ class _ProductAppBar extends StatelessWidget {
   }
 }
 
-class OrderForm extends StatelessWidget {
-  const OrderForm({Key? key}) : super(key: key);
+class OrderFormSliver extends StatelessWidget {
+  const OrderFormSliver({
+    Key? key,
+    required this.product,
+  }) : super(key: key);
+
+  final Product product;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return MultiSliver(
       children: [
-        DropDownButtonFormItem(
-          title: 'Milk',
-          items: const [
-            DropdownMenuItem(value: 'Soymilk', child: Text('Soymilk')),
-            DropdownMenuItem(value: 'Normal', child: Text('Normal')),
-            DropdownMenuItem(value: 'Almond', child: Text('Almond')),
-            DropdownMenuItem(value: 'Integral', child: Text('Integral')),
-          ],
-          onChanged: (_) {},
-          value: 'Soymilk',
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            childCount: product.customizations.length,
+            (context, index) {
+              final customization = product.customizations[index];
+
+              final widget = customization.when(
+                (id, name, description) => const SizedBox.shrink(),
+                items: (id, name, description, items) {
+                  return DropDownButtonFormItem(
+                    title: name,
+                    value: items.first,
+                    items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+                    onChanged: (_) {},
+                  );
+                },
+                cupSizes: (id, description, sizes) {
+                  return DropDownButtonFormItem(
+                    title: 'Size',
+                    value: sizes.first,
+                    items: sizes.map((size) => DropdownMenuItem(value: size, child: Text(size))).toList(),
+                    onChanged: (_) {},
+                  );
+                },
+              );
+
+              return Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: widget,
+              );
+            },
+          ),
         ),
-        const SizedBox(height: 16),
-        DropDownButtonFormItem(
-          title: 'Toppings',
-          items: const [
-            DropdownMenuItem(value: 'Vanilla Syrup', child: Text('Vanilla Syrup')),
-            DropdownMenuItem(value: 'Chocolate', child: Text('Chocolate')),
-            DropdownMenuItem(value: 'Cream', child: Text('Cream')),
-          ],
-          onChanged: (_) {},
-          value: 'Vanilla Syrup',
-        ),
-        const SizedBox(height: 16),
-        const CounterFormItem(),
-        const SizedBox(height: 72),
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.only(top: 16, bottom: 64),
+            child: CounterFormItem(),
+          ),
+        )
       ],
     );
   }

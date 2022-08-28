@@ -1,8 +1,8 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:sample_app/product/data/product_repository.dart';
+import 'package:sample_app/product/data/repository/product_repository.dart';
 
-import '../data/product.dart';
+import '../data/model/product.dart';
 
 part 'product_bloc.freezed.dart';
 

@@ -1,5 +1,5 @@
-import 'product.dart';
-import 'product_memory_data_source.dart';
+import '../model/product.dart';
+import '../memory/product_memory_data_source.dart';
 
 class ProductRepository {
   const ProductRepository(this.memoryDataSource);
