@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -372,44 +374,42 @@ class _OrderButtonState extends State<OrderButton> with TickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
-    double width = MediaQuery.of(context).size.width;
+    final double width = MediaQuery.of(context).size.width;
+    const double baseHeight = 56.0;
+    const double plateauHeight = 56.0;
 
     return GestureDetector(
       onTapDown: (details) => _tapController.forward(),
       onTap: widget.onPressed,
       onTapUp: (details) => _tapController.reverse(),
       child: AnimatedBuilder(
-        animation: _tapAnimation,
+        animation: Listenable.merge([_tapAnimation, _sizeController]),
         builder: (context, child) {
-          return Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(),
-              AnimatedBuilder(
-                animation: _sizeController,
-                builder: (context, child) {
-                  return CustomPaint(
-                    size: SizeTween(
-                      begin: const Size(200, 56),
-                      end: Size(width, 56),
-                    ).evaluate(_sizeController) ?? Size.zero,
-                    painter: _OrderButtonPainter(
-                        plateauHeight: 0,
-                        radius: 24,
-                        color: _tapAnimation.value ?? Colors.transparent),
-                  );
-                },
-              ),
-              Text(
-                widget.text,
-                style: TextStyle(
-                    color: _textColor.withOpacity(
-                      Tween<double>(begin: 1, end: 0.7).evaluate(_tapController),
-                    ),
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold),
-              ),
-            ],
+          final plateauAnimatedHeight = plateauHeight * _sizeController.value;
+          final totalHeight = baseHeight + plateauAnimatedHeight;
+
+          return CustomPaint(
+            size: SizeTween(
+                  begin: Size(200, totalHeight),
+                  end: Size(width, totalHeight),
+                ).evaluate(_sizeController) ??
+                Size.zero,
+            painter: _OrderButtonPainter(
+                plateauHeight: plateauAnimatedHeight,
+                baseHeight: baseHeight,
+                baseText: widget.text,
+                baseTextColor: _textColor.withOpacity(
+                  Tween<double>(begin: 1, end: 0.7).evaluate(_tapController),
+                ),
+                orderValueTextColor: _textColor.withOpacity(
+                  min(
+                    Tween<double>(begin: 1, end: 0.7).evaluate(_tapController),
+                    Tween<double>(begin: 0, end: 1).evaluate(_sizeController),
+                  ),
+                ),
+                orderValueText: _OrderValueText(currency: r'$', integer: '3', decimals: '20'),
+                radius: 26,
+                color: _tapAnimation.value ?? Colors.transparent),
           );
         },
       ),
@@ -417,30 +417,114 @@ class _OrderButtonState extends State<OrderButton> with TickerProviderStateMixin
   }
 }
 
+class _OrderValueText {
+  _OrderValueText({
+    required this.currency,
+    required this.integer,
+    required this.decimals,
+  });
+
+  final String currency;
+  final String integer;
+  final String decimals;
+}
+
 class _OrderButtonPainter extends CustomPainter {
   _OrderButtonPainter({
     required this.plateauHeight,
+    required this.baseHeight,
     required this.radius,
     required this.color,
+    required this.baseText,
+    required this.baseTextColor,
+    required this.orderValueTextColor,
+    required this.orderValueText,
   });
 
   final double plateauHeight;
+  final double baseHeight;
   final double radius;
   final Color color;
+  final Color baseTextColor;
+  final Color orderValueTextColor;
+  final String baseText;
+  final _OrderValueText? orderValueText;
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color;
 
-    final rrect = RRect.fromRectAndCorners(Offset.zero & size, topLeft: Radius.circular(radius));
+    final textPainter = TextPainter(textDirection: TextDirection.ltr);
 
-    canvas.drawRRect(rrect, paint);
+    const smallFontSize = 20.0;
+    const bigFontSize = 27.0;
+    final orderValueText = this.orderValueText;
+    textPainter.text = TextSpan(
+      children: orderValueText == null
+          ? []
+          : [
+              TextSpan(
+                text: orderValueText.currency,
+                style: TextStyle(color: orderValueTextColor, fontSize: smallFontSize, fontWeight: FontWeight.bold),
+              ),
+              TextSpan(
+                text: '${orderValueText.integer}.',
+                style: TextStyle(color: orderValueTextColor, fontSize: bigFontSize, fontWeight: FontWeight.bold),
+              ),
+              TextSpan(
+                text: orderValueText.decimals,
+                style: TextStyle(color: orderValueTextColor, fontSize: smallFontSize, fontWeight: FontWeight.bold),
+              ),
+            ],
+    );
+    textPainter.layout();
+
+    const plateauPadding = 32;
+    final plateauWidth = textPainter.width + plateauPadding * 2; // adding some padding
+
+    double plateauRadius() => min(radius, plateauHeight / 2);
+
+    Path path = Path()
+    ..moveTo(0, size.height)
+    ..relativeLineTo(0, -baseHeight + radius)
+    ..relativeCubicTo(0, 0, 0, -radius, radius, -radius)
+    ..lineTo(size.width - plateauWidth - plateauRadius(), size.height - baseHeight)
+      // Plateau:
+    ..relativeCubicTo(0, 0, plateauRadius(), 0, plateauRadius(), -plateauRadius())
+    ..relativeLineTo(0, -plateauHeight + 2 * plateauRadius())
+    ..relativeCubicTo(0, 0, 0, -plateauRadius(), plateauRadius(), -plateauRadius())
+    ..lineTo(size.width - plateauRadius(), 0)
+    ..relativeCubicTo(0, 0, plateauRadius(), 0, plateauRadius(), plateauRadius())
+    ..lineTo(size.width, size.height)
+    ..close();
+
+    canvas.drawPath(path, paint);
+
+    // paint plateau text
+    textPainter.paint(
+      canvas,
+      Offset(size.width - plateauWidth + plateauPadding, plateauHeight / 2 - textPainter.height / 2),
+    );
+
+    // paint base text
+    textPainter.text = TextSpan(
+        text: baseText,
+        style: TextStyle(color: baseTextColor, fontSize: 14, fontWeight: FontWeight.bold),
+      );
+
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(size.width / 2 - textPainter.width / 2, plateauHeight + baseHeight / 2 - textPainter.height / 2),
+    );
   }
 
   @override
-  bool shouldRepaint(_OrderButtonPainter oldDelegate) =>
-      oldDelegate.plateauHeight != plateauHeight ||
-          oldDelegate.radius != radius ||
-          oldDelegate.color != color;
+  bool shouldRepaint(_OrderButtonPainter oldDelegate) {
+    return oldDelegate.plateauHeight != plateauHeight || //
+        oldDelegate.baseHeight != baseHeight || //
+        oldDelegate.radius != radius || //
+        oldDelegate.color != color;
+  }
 }
