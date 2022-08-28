@@ -3,6 +3,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sample_app/order/data/memory/order_memory_data_source.dart';
+import 'package:sample_app/order/data/repository/order_repository.dart';
 import 'package:sample_app/product/data/memory/product_memory_data_source.dart';
 import 'package:sample_app/product/data/repository/product_repository.dart';
 import 'package:sample_app/product/ui/product_bloc.dart';
@@ -24,7 +26,11 @@ class _ProductScreenState extends State<ProductScreen> with SingleTickerProvider
   double expandedHeight = 400;
   bool shouldShowForm = false;
   OrderButtonState buttonState = OrderButtonState.collapsed;
-  final bloc = ProductBloc(id: '123', productRepository: ProductRepository(ProductMemoryDataSource())); // TODO: Improve Dependency Injection
+  final bloc = ProductBloc(
+    id: '123',
+    productRepository: ProductRepository(ProductMemoryDataSource()),
+    orderRepository: OrderRepository(OrderMemoryDataSource()),
+  ); // TODO: Improve Dependency Injection
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +53,7 @@ class _ProductScreenState extends State<ProductScreen> with SingleTickerProvider
                       child: Padding(
                         padding: const EdgeInsets.only(top: 32, left: 32, right: 32),
                         child: state.maybeWhen(
-                          loaded: (product) => _ProductDescription(product: product),
+                          (product, order) => _ProductDescription(product: product),
                           orElse: () => const Center(child: CircularProgressIndicator()),
                         ),
                       ),
@@ -56,8 +62,8 @@ class _ProductScreenState extends State<ProductScreen> with SingleTickerProvider
                       padding: const EdgeInsets.symmetric(horizontal: 32),
                       sliver: SliverAnimatedSwitcher(
                           duration: const Duration(milliseconds: 200),
-                          child: shouldShowForm && state is ProductLoadedState
-                              ? OrderFormSliver(product: state.product)
+                          child: shouldShowForm && state is DefaultProductState
+                              ? OrderFormSliver(bloc: bloc)
                               : const SliverToBoxAdapter(
                                   child: SizedBox.shrink(),
                                 )),
@@ -150,55 +156,67 @@ class _ProductAppBar extends StatelessWidget {
 class OrderFormSliver extends StatelessWidget {
   const OrderFormSliver({
     Key? key,
-    required this.product,
+    required this.bloc,
   }) : super(key: key);
 
-  final Product product;
+  final ProductBloc bloc;
 
   @override
   Widget build(BuildContext context) {
-    return MultiSliver(
-      children: [
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            childCount: product.customizations.length,
-            (context, index) {
-              final customization = product.customizations[index];
+    return BlocBuilder<ProductBloc, ProductState>(
+      bloc: bloc,
+      builder: (context, state) {
+        if (state is! DefaultProductState) {
+          return const SliverToBoxAdapter(child: SizedBox.shrink());
+        }
 
-              final widget = customization.when(
-                (id, name, description) => const SizedBox.shrink(),
-                items: (id, name, description, items) {
-                  return DropDownButtonFormItem(
-                    title: name,
-                    value: items.first,
-                    items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
-                    onChanged: (_) {},
+        final product = state.product;
+        final order = state.order;
+
+        return MultiSliver(
+          children: [
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                childCount: state.product.customizations.length,
+                (context, index) {
+                  final customization = product.customizations[index];
+
+                  final widget = customization.when(
+                    (id, name, description) => const SizedBox.shrink(),
+                    items: (id, name, description, items) {
+                      return DropDownButtonFormItem(
+                        title: name,
+                        value: order.customizations.where((customization) => customization.id == id).first.value,
+                        items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+                        onChanged: (value) => bloc.add(ProductEvent.customizationChanged(customizationId: id, newCustomizationValue: value!)),
+                      );
+                    },
+                    cupSizes: (id, description, sizes) {
+                      return DropDownButtonFormItem(
+                        title: 'Size',
+                        value: order.customizations.where((customization) => customization.id == id).first.value,
+                        items: sizes.map((size) => DropdownMenuItem(value: size, child: Text(size))).toList(),
+                        onChanged: (value) => bloc.add(ProductEvent.customizationChanged(customizationId: id, newCustomizationValue: value!)),
+                      );
+                    },
+                  );
+
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: widget,
                   );
                 },
-                cupSizes: (id, description, sizes) {
-                  return DropDownButtonFormItem(
-                    title: 'Size',
-                    value: sizes.first,
-                    items: sizes.map((size) => DropdownMenuItem(value: size, child: Text(size))).toList(),
-                    onChanged: (_) {},
-                  );
-                },
-              );
-
-              return Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: widget,
-              );
-            },
-          ),
-        ),
-        const SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.only(top: 16, bottom: 64),
-            child: CounterFormItem(),
-          ),
-        )
-      ],
+              ),
+            ),
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.only(top: 16, bottom: 64),
+                child: CounterFormItem(),
+              ),
+            )
+          ],
+        );
+      }
     );
   }
 }
