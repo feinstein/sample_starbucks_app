@@ -76,8 +76,9 @@ class _ProductScreenState extends State<ProductScreen> with SingleTickerProvider
                   end: 0,
                   child: state is LoadingProductState
                       ? const SizedBox.shrink()
-                      : OrderButton(
+                      : _OrderButton(
                           text: buttonState == OrderButtonState.collapsed ? 'CUSTOMIZE YOUR DRINK' : 'ADD TO ORDER',
+                          orderValueText: _OrderValueText(currency: r'$', integer: '3', decimals: '20'),
                           onPressed: () {
                             setState(() {
                               buttonState = buttonState == OrderButtonState.expanded ? OrderButtonState.collapsed : OrderButtonState.expanded;
@@ -179,24 +180,33 @@ class OrderFormSliver extends StatelessWidget {
               delegate: SliverChildBuilderDelegate(
                 childCount: state.product.customizations.length,
                 (context, index) {
-                  final customization = product.customizations[index];
+                  final productCustomization = product.customizations[index];
 
-                  final widget = customization.when(
-                    (id, name, description) => const SizedBox.shrink(),
+                  final widget = productCustomization.when(
                     items: (id, name, description, items) {
                       return DropDownButtonFormItem(
                         title: name,
-                        value: order.customizations.where((customization) => customization.id == id).first.value,
-                        items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
-                        onChanged: (value) => bloc.add(ProductEvent.customizationChanged(customizationId: id, newCustomizationValue: value!)),
+                        value: order.customizations.firstWhere((orderCustomization) => orderCustomization.customizationId == id).customizationItemId,
+                        items: items.map((item) => DropdownMenuItem(value: item.id, child: Text(item.name))).toList(),
+                        onChanged: (customizationItemId) => bloc.add(
+                          ProductEvent.customizationChanged(
+                            productCustomizationId: id,
+                            newCustomizationItemId: customizationItemId!,
+                          ),
+                        ),
                       );
                     },
                     cupSizes: (id, description, sizes) {
                       return DropDownButtonFormItem(
                         title: 'Size',
-                        value: order.customizations.where((customization) => customization.id == id).first.value,
-                        items: sizes.map((size) => DropdownMenuItem(value: size, child: Text(size))).toList(),
-                        onChanged: (value) => bloc.add(ProductEvent.customizationChanged(customizationId: id, newCustomizationValue: value!)),
+                        value: order.customizations.firstWhere((orderCustomization) => orderCustomization.customizationId == id).customizationItemId,
+                        items: sizes.map((size) => DropdownMenuItem(value: size.id, child: Text(size.name))).toList(),
+                        onChanged: (customizationItemId) => bloc.add(
+                          ProductEvent.customizationChanged(
+                            productCustomizationId: id,
+                            newCustomizationItemId: customizationItemId!,
+                          ),
+                        ),
                       );
                     },
                   );
@@ -346,23 +356,25 @@ enum OrderButtonState {
 
 typedef OrderButtonStateCallback = void Function(OrderButtonState state);
 
-class OrderButton extends StatefulWidget {
-  const OrderButton({
+class _OrderButton extends StatefulWidget {
+  const _OrderButton({
     Key? key,
     required this.text,
+    required this.orderValueText,
     required this.buttonState,
     this.onPressed,
   }) : super(key: key);
 
+  final String text;
+  final _OrderValueText orderValueText;
   final VoidCallback? onPressed;
   final OrderButtonState buttonState;
-  final String text;
 
   @override
-  State<OrderButton> createState() => _OrderButtonState();
+  State<_OrderButton> createState() => _OrderButtonState();
 }
 
-class _OrderButtonState extends State<OrderButton> with TickerProviderStateMixin {
+class _OrderButtonState extends State<_OrderButton> with TickerProviderStateMixin {
   // TODO: Improve color and Theme configurations
   static const _textColor = Color(0xFF296146);
   static const _backgroundColor = Color(0xFFE3F5EE);
@@ -384,7 +396,7 @@ class _OrderButtonState extends State<OrderButton> with TickerProviderStateMixin
   }
 
   @override
-  void didUpdateWidget(OrderButton oldWidget) {
+  void didUpdateWidget(_OrderButton oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.buttonState != widget.buttonState) {
       _animateShape();
@@ -432,7 +444,7 @@ class _OrderButtonState extends State<OrderButton> with TickerProviderStateMixin
                     Tween<double>(begin: 0, end: 1).evaluate(_sizeController),
                   ),
                 ),
-                orderValueText: _OrderValueText(currency: r'$', integer: '3', decimals: '20'),
+                orderValueText: widget.orderValueText,
                 radius: 26,
                 color: _tapAnimation.value ?? Colors.transparent),
           );

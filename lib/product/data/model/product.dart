@@ -17,47 +17,39 @@ class Product with _$Product {
   factory Product.fromJson(Map<String, Object?> json) => _$ProductFromJson(json);
 }
 
-abstract class _ProductCustomization {
-  const _ProductCustomization({
-    required this.id,
-    required this.name,
-    this.description,
-  });
-
-  final String id;
-  final String name;
-  final String? description;
-
-  Map<String, Object?> toJson();
-}
-
 @freezed
-class ProductCustomization with _$ProductCustomization implements _ProductCustomization {
-  const ProductCustomization._();
-
-  const factory ProductCustomization({
-    required String id,
-    required String name,
-    required String? description,
-  }) = _ProductCustomizationGeneric;
-
+class ProductCustomization with _$ProductCustomization {
   const factory ProductCustomization.items({
     required String id,
     required String name,
     String? description,
-    required List<String> items,
+    required List<ProductCustomizationItem> items,
   }) = _ProductCustomizationItems;
 
   const factory ProductCustomization.cupSizes({
     required String id,
     String? description,
-    required List<String> sizes,
+    required List<ProductCustomizationItem> sizes,
   }) = _ProductCustomizationCupSizes;
 
-  @override
-  String get name => map((generic) => generic.name, items: (items) => items.name, cupSizes: (cupSizes) => 'cupSizes');
+  const ProductCustomization._();
+
+  String get name => map(items: (items) => items.name, cupSizes: (cupSizes) => 'cupSizes');
 
   factory ProductCustomization.fromJson(Map<String, Object?> json) => const _ProductCustomizationConverter().fromJson(json);
+}
+
+@freezed
+class ProductCustomizationItem with _$ProductCustomizationItem {
+  const ProductCustomizationItem._();
+
+  const factory ProductCustomizationItem({
+    required String id,
+    required String name,
+    required double price,
+  }) = _ProductCustomizationItem;
+
+  factory ProductCustomizationItem.fromJson(Map<String, Object?> json) => _$ProductCustomizationItemFromJson(json);
 }
 
 class _ProductCustomizationConverter implements JsonConverter<ProductCustomization, Map<String, Object?>> {
@@ -75,10 +67,10 @@ class _ProductCustomizationConverter implements JsonConverter<ProductCustomizati
     } else if (json['type'] == 'cup_sizes') {
       return _ProductCustomizationCupSizes.fromJson(json);
     } else {
-      return _ProductCustomizationGeneric.fromJson(json);
+      throw ArgumentError('The json provided can not be mapped to a ProductCustomization');
     }
   }
 
   @override
-  Map<String, dynamic> toJson(_ProductCustomization data) => data.toJson();
+  Map<String, dynamic> toJson(ProductCustomization data) => data.toJson();
 }

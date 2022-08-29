@@ -34,14 +34,28 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       productId: product.id,
       quantity: 1,
       customizations: product.customizations.map(
-        (customization) {
+        (productCustomization) {
+          final customizationItemId = productCustomization.map(
+            items: (items) => items.items.first.id,
+            cupSizes: (cupSizes) => cupSizes.sizes.first.id,
+          );
+
+          final name = productCustomization.map(
+            items: (items) => items.items.first.name,
+            cupSizes: (cupSizes) => cupSizes.sizes.first.name,
+          );
+
+          final price = productCustomization.map(
+            items: (items) => items.items.first.price,
+            cupSizes: (cupSizes) => cupSizes.sizes.first.price,
+          );
+
           return OrderProductCustomization(
-            id: customization.id,
-            value: customization.map(
-              (value) => value.name,
-              items: (items) => items.items.first,
-              cupSizes: (cupSizes) => cupSizes.sizes.first,
-            ),
+            productId: product.id,
+            customizationId: productCustomization.id,
+            customizationItemId: customizationItemId,
+            name: name,
+            price: price,
           );
         },
       ).toList(),
@@ -56,13 +70,28 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       return;
     }
 
-    final newOrder = state.order.copyWith(
-        customizations: state.order.customizations.map((customization) {
-      if (customization.id == event.customizationId) {
-        return customization.copyWith(value: event.newCustomizationValue);
+    final currentOrder = state.order;
+
+    final newOrder = currentOrder.copyWith(
+        customizations: currentOrder.customizations.map((orderCustomization) {
+
+      if (orderCustomization.customizationId == event.productCustomizationId) {
+        final productCustomization = state.product.customizations.firstWhere((productCustomization) => productCustomization.id == event.productCustomizationId);
+        final productCustomizationItem = productCustomization.when(
+          items: (id, name, description, items) => items.firstWhere((item) => item.id == event.newCustomizationItemId),
+          cupSizes: (id, description, sizes) => sizes.firstWhere((size) => size.id == event.newCustomizationItemId),
+        );
+
+        return OrderProductCustomization(
+          productId: orderCustomization.productId,
+          customizationId: event.productCustomizationId,
+          customizationItemId: event.newCustomizationItemId,
+          name: productCustomizationItem.name,
+          price: productCustomizationItem.price,
+        );
       }
 
-      return customization;
+      return orderCustomization;
     }).toList());
 
     emit(ProductState(product: state.product, order: newOrder));
@@ -99,8 +128,8 @@ class ProductEvent with _$ProductEvent {
   const factory ProductEvent.load({required String id}) = LoadProductEvent;
 
   const factory ProductEvent.customizationChanged({
-    required String customizationId,
-    required String newCustomizationValue,
+    required String productCustomizationId,
+    required String newCustomizationItemId,
   }) = ProductCustomizationChangeEvent;
 
   const factory ProductEvent.orderQuantityDecrement() = OrderQuantityDecrementEvent;
