@@ -221,7 +221,7 @@ class OrderFormSliver extends StatelessWidget {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.only(top: 16, bottom: 130),//64),
+                padding: const EdgeInsets.only(top: 16, bottom: 64),
                 child: CounterFormItem(
                   count: state.order.quantity,
                   onDecrement: () => bloc.add(const ProductEvent.orderQuantityDecrement()),
@@ -426,28 +426,37 @@ class _OrderButtonState extends State<_OrderButton> with TickerProviderStateMixi
           final plateauAnimatedHeight = plateauHeight * _sizeController.value;
           final totalHeight = baseHeight + plateauAnimatedHeight;
 
-          return CustomPaint(
-            size: SizeTween(
-                  begin: Size(200, totalHeight),
-                  end: Size(width, totalHeight),
-                ).evaluate(_sizeController) ??
-                Size.zero,
-            painter: _OrderButtonPainter(
+          return ClipPath(
+            clipper: _OrderButtonClipper(
                 plateauHeight: plateauAnimatedHeight,
                 baseHeight: baseHeight,
                 baseText: widget.text,
-                baseTextColor: _textColor.withOpacity(
-                  Tween<double>(begin: 1, end: 0.7).evaluate(_tapController),
-                ),
-                orderValueTextColor: _textColor.withOpacity(
-                  min(
-                    Tween<double>(begin: 1, end: 0.7).evaluate(_tapController),
-                    Tween<double>(begin: 0, end: 1).evaluate(_sizeController),
-                  ),
-                ),
                 orderValueText: widget.orderValueText,
                 radius: 26,
-                color: _tapAnimation.value ?? Colors.transparent),
+            ),
+            child: CustomPaint(
+              size: SizeTween(
+                    begin: Size(200, totalHeight),
+                    end: Size(width, totalHeight),
+                  ).evaluate(_sizeController) ??
+                  Size.zero,
+              painter: _OrderButtonPainter(
+                  plateauHeight: plateauAnimatedHeight,
+                  baseHeight: baseHeight,
+                  baseText: widget.text,
+                  baseTextColor: _textColor.withOpacity(
+                    Tween<double>(begin: 1, end: 0.7).evaluate(_tapController),
+                  ),
+                  orderValueTextColor: _textColor.withOpacity(
+                    min(
+                      Tween<double>(begin: 1, end: 0.7).evaluate(_tapController),
+                      Tween<double>(begin: 0, end: 1).evaluate(_sizeController),
+                    ),
+                  ),
+                  orderValueText: widget.orderValueText,
+                  radius: 26,
+                  color: _tapAnimation.value ?? Colors.transparent),
+            ),
           );
         },
       ),
@@ -568,5 +577,79 @@ class _OrderButtonPainter extends CustomPainter {
       canvas,
       Offset(size.width / 2 - textPainter.width / 2, plateauHeight + baseHeight / 2 - textPainter.height / 2),
     );
+  }
+}
+
+class _OrderButtonClipper extends CustomClipper<Path> {
+  _OrderButtonClipper({
+    required this.plateauHeight,
+    required this.baseHeight,
+    required this.radius,
+    required this.baseText,
+    required this.orderValueText,
+  });
+
+  final double plateauHeight;
+  final double baseHeight;
+  final double radius;
+  final String baseText;
+  final _OrderValueText? orderValueText;
+
+  @override
+  Path getClip(Size size) {
+    final textPainter = TextPainter(textDirection: TextDirection.ltr);
+
+    const smallFontSize = 20.0;
+    const bigFontSize = 27.0;
+    final orderValueText = this.orderValueText;
+    textPainter.text = TextSpan(
+      children: orderValueText == null
+          ? []
+          : [
+        TextSpan(
+          text: orderValueText.currency,
+          style: const TextStyle(fontSize: smallFontSize, fontWeight: FontWeight.bold),
+        ),
+        TextSpan(
+          text: '${orderValueText.integer}.',
+          style: const TextStyle(fontSize: bigFontSize, fontWeight: FontWeight.bold),
+        ),
+        TextSpan(
+          text: orderValueText.decimals,
+          style: const TextStyle(fontSize: smallFontSize, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+    textPainter.layout();
+
+    const plateauPadding = 32;
+    final plateauWidth = textPainter.width + plateauPadding * 2; // adding some padding
+
+    double plateauRadius() => min(radius, plateauHeight / 2);
+
+    Path path = Path()
+      ..moveTo(0, size.height)
+      ..relativeLineTo(0, -baseHeight + radius)
+      ..relativeCubicTo(0, 0, 0, -radius, radius, -radius)
+      ..lineTo(size.width - plateauWidth - plateauRadius(), size.height - baseHeight)
+    // Plateau:
+      ..relativeCubicTo(0, 0, plateauRadius(), 0, plateauRadius(), -plateauRadius())
+      ..relativeLineTo(0, -plateauHeight + 2 * plateauRadius())
+      ..relativeCubicTo(0, 0, 0, -plateauRadius(), plateauRadius(), -plateauRadius())
+      ..lineTo(size.width - plateauRadius(), 0)
+      ..relativeCubicTo(0, 0, plateauRadius(), 0, plateauRadius(), plateauRadius())
+      ..lineTo(size.width, size.height)
+      ..close();
+
+    return path;
+  }
+
+  @override
+  bool shouldReclip(_OrderButtonClipper oldClipper) {
+    return oldClipper.plateauHeight != plateauHeight ||
+    oldClipper.baseHeight != baseHeight ||
+    oldClipper.radius != radius ||
+    oldClipper.baseText != baseText ||
+    oldClipper.orderValueText != orderValueText;
   }
 }
