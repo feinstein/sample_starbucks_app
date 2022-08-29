@@ -36,62 +36,63 @@ class _ProductScreenState extends State<ProductScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     return Scaffold(
       body: BlocBuilder<ProductBloc, ProductState>(
-          bloc: bloc,
-          builder: (context, state) {
-            return Stack(
-              children: [
-                CustomScrollView(
-                  slivers: [
-                    TweenAnimationBuilder(
-                      tween: Tween<double>(begin: 400, end: expandedHeight),
-                      duration: const Duration(milliseconds: 300),
-                      builder: (BuildContext context, double height, Widget? child) {
-                        return _ProductAppBar(height: height);
-                      },
-                    ),
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 32, left: 32, right: 32),
-                        child: state.maybeWhen(
-                          (product, order) => _ProductDescription(product: product),
-                          orElse: () => const Center(child: CircularProgressIndicator()),
-                        ),
+        bloc: bloc,
+        builder: (context, state) {
+          return Stack(
+            children: [
+              CustomScrollView(
+                slivers: [
+                  TweenAnimationBuilder(
+                    tween: Tween<double>(begin: 400, end: expandedHeight),
+                    duration: const Duration(milliseconds: 300),
+                    builder: (BuildContext context, double height, Widget? child) {
+                      return _ProductAppBar(height: height);
+                    },
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 32, left: 32, right: 32),
+                      child: state.maybeWhen(
+                        (product, order) => _ProductDescription(product: product),
+                        orElse: () => const Center(child: CircularProgressIndicator()),
                       ),
                     ),
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32),
-                      sliver: SliverAnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
-                          child: shouldShowForm && state is DefaultProductState
-                              ? OrderFormSliver(bloc: bloc)
-                              : const SliverToBoxAdapter(
-                                  child: SizedBox.shrink(),
-                                )),
-                    ),
-                  ],
-                ),
-                Positioned.directional(
-                  textDirection: Directionality.of(context),
-                  bottom: 0,
-                  end: 0,
-                  child: state is LoadingProductState
-                      ? const SizedBox.shrink()
-                      : _OrderButton(
-                          text: buttonState == OrderButtonState.collapsed ? 'CUSTOMIZE YOUR DRINK' : 'ADD TO ORDER',
-                          orderValueText: _OrderValueText(currency: r'$', integer: '3', decimals: '20'),
-                          onPressed: () {
-                            setState(() {
-                              buttonState = buttonState == OrderButtonState.expanded ? OrderButtonState.collapsed : OrderButtonState.expanded;
-                              shouldShowForm = buttonState == OrderButtonState.expanded;
-                              expandedHeight = buttonState == OrderButtonState.expanded ? 200 : 400;
-                            });
-                          },
-                          buttonState: buttonState,
-                        ),
-                ),
-              ],
-            );
-          }),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    sliver: SliverAnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: shouldShowForm && state is DefaultProductState
+                            ? OrderFormSliver(bloc: bloc)
+                            : const SliverToBoxAdapter(
+                                child: SizedBox.shrink(),
+                              )),
+                  ),
+                ],
+              ),
+              Positioned.directional(
+                textDirection: Directionality.of(context),
+                bottom: 0,
+                end: 0,
+                child: state is LoadingProductState
+                    ? const SizedBox.shrink()
+                    : _OrderButton(
+                        text: buttonState == OrderButtonState.collapsed ? 'CUSTOMIZE YOUR DRINK' : 'ADD TO ORDER',
+                        orderValueText: state.whenOrNull((product, order) => _OrderValueText(currency: r'$', value: order.totalPrice)) ?? _OrderValueText(currency: r'$', value: 0),
+                        onPressed: () {
+                          setState(() {
+                            buttonState = buttonState == OrderButtonState.expanded ? OrderButtonState.collapsed : OrderButtonState.expanded;
+                            shouldShowForm = buttonState == OrderButtonState.expanded;
+                            expandedHeight = buttonState == OrderButtonState.expanded ? 200 : 400;
+                          });
+                        },
+                        buttonState: buttonState,
+                      ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -457,13 +458,13 @@ class _OrderButtonState extends State<_OrderButton> with TickerProviderStateMixi
 class _OrderValueText {
   _OrderValueText({
     required this.currency,
-    required this.integer,
-    required this.decimals,
+    required this.value,
   });
 
   final String currency;
-  final String integer;
-  final String decimals;
+  final double value;
+  String get integer => value.truncate().toString();
+  String get decimals => ((value - value.truncate()) * 100).truncate().toString().padRight(2, '0');
 }
 
 class _OrderButtonPainter extends CustomPainter {
@@ -486,6 +487,18 @@ class _OrderButtonPainter extends CustomPainter {
   final Color orderValueTextColor;
   final String baseText;
   final _OrderValueText? orderValueText;
+
+  @override
+  bool shouldRepaint(_OrderButtonPainter oldDelegate) {
+    return oldDelegate.plateauHeight != plateauHeight || //
+        oldDelegate.baseHeight != baseHeight || //
+        oldDelegate.radius != radius || //
+        oldDelegate.color != color || //
+        oldDelegate.baseText != baseText || //
+        oldDelegate.baseTextColor != baseTextColor || //
+        oldDelegate.orderValueTextColor != orderValueTextColor || //
+        oldDelegate.orderValueText != orderValueText;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -555,13 +568,5 @@ class _OrderButtonPainter extends CustomPainter {
       canvas,
       Offset(size.width / 2 - textPainter.width / 2, plateauHeight + baseHeight / 2 - textPainter.height / 2),
     );
-  }
-
-  @override
-  bool shouldRepaint(_OrderButtonPainter oldDelegate) {
-    return oldDelegate.plateauHeight != plateauHeight || //
-        oldDelegate.baseHeight != baseHeight || //
-        oldDelegate.radius != radius || //
-        oldDelegate.color != color;
   }
 }

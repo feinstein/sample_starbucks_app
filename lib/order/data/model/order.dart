@@ -15,7 +15,7 @@ class Order with _$Order {
 
   factory Order.fromJson(Map<String, Object?> json) => _$OrderFromJson(json);
 
-  late final double totalPrice = customizations.fold<double>(0.0, (previousValue, customization) => previousValue + customization.price);
+  late final double totalPrice = quantity * customizations.fold<double>(0.0, (previousValue, customization) => previousValue + customization.price);
 }
 
 @freezed
