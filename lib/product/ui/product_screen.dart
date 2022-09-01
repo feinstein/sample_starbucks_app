@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -82,7 +83,7 @@ class _ProductScreenState extends State<ProductScreen> with SingleTickerProvider
                     ? const SizedBox.shrink()
                     : _OrderButton(
                         text: buttonState == OrderButtonState.collapsed ? 'CUSTOMIZE YOUR DRINK' : 'ADD TO ORDER',
-                        orderValueText: state.whenOrNull((product, order) => _OrderValueText(currency: r'$', value: order.totalPrice)) ?? _OrderValueText(currency: r'$', value: 0),
+                        orderValueText: state.whenOrNull((product, order) => _OrderValueText(currency: r'$', value: order.totalPrice)) ?? _OrderValueText(currency: r'$', value: Decimal.zero),
                         onPressed: () {
                           setState(() {
                             buttonState = buttonState == OrderButtonState.expanded ? OrderButtonState.collapsed : OrderButtonState.expanded;
@@ -481,10 +482,10 @@ class _OrderValueText {
     required this.currency,
     required this.value,
   })  : integer = value.truncate().toString(),
-        decimals = ((value - value.truncate()) * 100).truncate().toString().padRight(2, '0');
+        decimals = ((value - value.truncate()) * Decimal.fromInt(100)).truncate().toString().padLeft(2, '0');
 
   final String currency;
-  final double value;
+  final Decimal value;
   final String integer;
   final String decimals;
 }

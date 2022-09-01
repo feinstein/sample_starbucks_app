@@ -1,3 +1,4 @@
+import 'package:decimal/decimal.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'product.freezed.dart';
@@ -46,7 +47,7 @@ class ProductCustomizationItem with _$ProductCustomizationItem {
   const factory ProductCustomizationItem({
     required String id,
     required String name,
-    required double price,
+    required Decimal price,
   }) = _ProductCustomizationItem;
 
   factory ProductCustomizationItem.fromJson(Map<String, Object?> json) => _$ProductCustomizationItemFromJson(json);

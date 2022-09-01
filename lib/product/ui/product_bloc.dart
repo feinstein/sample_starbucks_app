@@ -16,8 +16,8 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   }) : super(const ProductState.loading()) {
     on<LoadProductEvent>(_loadProductById);
     on<ProductCustomizationChangeEvent>(_productCustomizationChanged);
-    on<OrderQuantityDecrementEvent>(_orderQuantityDecrement);
-    on<OrderQuantityIncrementEvent>(_orderQuantityIncrement);
+    on<OrderQuantityDecrementEvent>(_orderQuantityChanged);
+    on<OrderQuantityIncrementEvent>(_orderQuantityChanged);
 
     add(ProductEvent.load(id: id));
   }
@@ -64,6 +64,11 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     emit(ProductState(product: product, order: order));
   }
 
+  @visibleForTesting
+  ProductCustomizationItem getProductCustomizationItemById(String newCustomizationItemId, List<ProductCustomizationItem> items) {
+    return items.firstWhere((item) => item.id == newCustomizationItemId);
+  }
+
   void _productCustomizationChanged(ProductCustomizationChangeEvent event, Emitter<ProductState> emit) async {
     final state = this.state;
     if (state is! DefaultProductState) {
@@ -73,52 +78,48 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     final currentOrder = state.order;
 
     final newOrder = currentOrder.copyWith(
-        customizations: currentOrder.customizations.map((orderCustomization) {
+        customizations: currentOrder.customizations.map(
+      (orderCustomization) {
+        if (orderCustomization.customizationId == event.productCustomizationId) {
+          final productCustomization = state.product.customizations.firstWhere((productCustomization) => productCustomization.id == event.productCustomizationId);
+          final productCustomizationItem = productCustomization.when(
+            items: (id, name, description, items) => getProductCustomizationItemById(event.newCustomizationItemId, items),
+            cupSizes: (id, description, sizes) => getProductCustomizationItemById(event.newCustomizationItemId, sizes),
+          );
 
-      if (orderCustomization.customizationId == event.productCustomizationId) {
-        final productCustomization = state.product.customizations.firstWhere((productCustomization) => productCustomization.id == event.productCustomizationId);
-        final productCustomizationItem = productCustomization.when(
-          items: (id, name, description, items) => items.firstWhere((item) => item.id == event.newCustomizationItemId),
-          cupSizes: (id, description, sizes) => sizes.firstWhere((size) => size.id == event.newCustomizationItemId),
-        );
+          return OrderProductCustomization(
+            productId: orderCustomization.productId,
+            customizationId: event.productCustomizationId,
+            customizationItemId: event.newCustomizationItemId,
+            name: productCustomizationItem.name,
+            price: productCustomizationItem.price,
+          );
+        }
 
-        return OrderProductCustomization(
-          productId: orderCustomization.productId,
-          customizationId: event.productCustomizationId,
-          customizationItemId: event.newCustomizationItemId,
-          name: productCustomizationItem.name,
-          price: productCustomizationItem.price,
-        );
-      }
-
-      return orderCustomization;
-    }).toList());
+        return orderCustomization;
+      },
+    ).toList());
 
     emit(ProductState(product: state.product, order: newOrder));
   }
 
-  void _orderQuantityDecrement(OrderQuantityDecrementEvent event, Emitter<ProductState> emit) async {
+  void _orderQuantityChanged(ProductEvent event, Emitter<ProductState> emit) async {
     final state = this.state;
     if (state is! DefaultProductState) {
       return;
     }
 
-    int currentQuantity = state.order.quantity;
-    if (currentQuantity - 1 > 0) {
-      final newOrder = state.order.copyWith(quantity: currentQuantity - 1);
+    int increment = event.maybeWhen(
+      orderQuantityIncrement: () => 1,
+      orderQuantityDecrement: () => -1,
+      orElse: () => 0,
+    );
+
+    int newQuantity = state.order.quantity + increment;
+    if (newQuantity > 0) {
+      final newOrder = state.order.copyWith(quantity: newQuantity);
       emit(ProductState(product: state.product, order: newOrder));
     }
-  }
-
-  void _orderQuantityIncrement(OrderQuantityIncrementEvent event, Emitter<ProductState> emit) async {
-    final state = this.state;
-    if (state is! DefaultProductState) {
-      return;
-    }
-
-    int currentQuantity = state.order.quantity;
-    final newOrder = state.order.copyWith(quantity: currentQuantity + 1);
-    emit(ProductState(product: state.product, order: newOrder));
   }
 }
 

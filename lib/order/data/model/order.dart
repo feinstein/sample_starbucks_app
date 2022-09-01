@@ -1,3 +1,4 @@
+import 'package:decimal/decimal.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'order.freezed.dart';
@@ -15,7 +16,7 @@ class Order with _$Order {
 
   factory Order.fromJson(Map<String, Object?> json) => _$OrderFromJson(json);
 
-  late final double totalPrice = quantity * customizations.fold<double>(0.0, (previousValue, customization) => previousValue + customization.price);
+  late final Decimal totalPrice = Decimal.fromInt(quantity) * customizations.fold(Decimal.zero, (previousValue, customization) => previousValue + customization.price);
 }
 
 @freezed
@@ -25,7 +26,7 @@ class OrderProductCustomization with _$OrderProductCustomization {
     required String customizationId,
     required String customizationItemId,
     required String name,
-    required double price,
+    required Decimal price,
   }) = _OrderProductCustomization;
 
   const OrderProductCustomization._();
