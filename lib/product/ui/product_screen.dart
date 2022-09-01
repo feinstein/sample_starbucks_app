@@ -10,7 +10,10 @@ import 'package:sample_app/product/data/repository/product_repository.dart';
 import 'package:sample_app/product/ui/product_bloc.dart';
 import 'package:sliver_tools/sliver_tools.dart';
 
+import '../../order/data/model/order.dart';
 import '../data/model/product.dart';
+
+const kDarkGreenColor = Color(0xFF223730);
 
 class ProductScreen extends StatefulWidget {
   static String routeName = 'product';
@@ -22,7 +25,8 @@ class ProductScreen extends StatefulWidget {
 }
 
 class _ProductScreenState extends State<ProductScreen> with SingleTickerProviderStateMixin {
-  double opacity = 0;
+  static const double kSmallAppBarHeight = 200;
+  static const double kBigAppBarHeight = 400;
   double expandedHeight = 400;
   bool shouldShowForm = false;
   OrderButtonState buttonState = OrderButtonState.collapsed;
@@ -83,7 +87,7 @@ class _ProductScreenState extends State<ProductScreen> with SingleTickerProvider
                           setState(() {
                             buttonState = buttonState == OrderButtonState.expanded ? OrderButtonState.collapsed : OrderButtonState.expanded;
                             shouldShowForm = buttonState == OrderButtonState.expanded;
-                            expandedHeight = buttonState == OrderButtonState.expanded ? 200 : 400;
+                            expandedHeight = buttonState == OrderButtonState.expanded ? kSmallAppBarHeight : kBigAppBarHeight;
                           });
                         },
                         buttonState: buttonState,
@@ -111,7 +115,7 @@ class _ProductDescription extends StatelessWidget {
       children: <Widget>[
         Text(
           product.name,
-          style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Color(0xFF223730)),
+          style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: kDarkGreenColor), // TODO: Extract the color into the Theme
         ),
         const SizedBox(height: 16),
         Text(
@@ -135,7 +139,7 @@ class _ProductAppBar extends StatelessWidget {
       title: const Text('STARBUCKS'),
       backgroundColor: const Color(0xFF1E3932),
       flexibleSpace: Image.asset(
-          'assets/starbucks_coffee.png',
+          'assets/starbucks_coffee.png', // TODO: Load from the repository
           frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
             return Padding(
               padding: const EdgeInsets.only(top: 86),
@@ -163,6 +167,21 @@ class OrderFormSliver extends StatelessWidget {
 
   final ProductBloc bloc;
 
+  @visibleForTesting
+  String getFirstCustomizationItemIdForCustomizationId(Order order, String customizationId) {
+    return order.customizations.firstWhere((orderCustomization) => orderCustomization.customizationId == customizationId).customizationItemId;
+  }
+
+  @visibleForTesting
+  void onCustomizationChanged({required String productCustomizationId, required String newCustomizationItemId}) {
+    bloc.add(
+        ProductEvent.customizationChanged(
+          productCustomizationId: productCustomizationId,
+          newCustomizationItemId: newCustomizationItemId,
+        ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<ProductBloc, ProductState>(
@@ -187,27 +206,21 @@ class OrderFormSliver extends StatelessWidget {
                     items: (id, name, description, items) {
                       return DropDownButtonFormItem(
                         title: name,
-                        value: order.customizations.firstWhere((orderCustomization) => orderCustomization.customizationId == id).customizationItemId,
+                        value: getFirstCustomizationItemIdForCustomizationId(order, id),
                         items: items.map((item) => DropdownMenuItem(value: item.id, child: Text(item.name))).toList(),
-                        onChanged: (customizationItemId) => bloc.add(
-                          ProductEvent.customizationChanged(
-                            productCustomizationId: id,
-                            newCustomizationItemId: customizationItemId!,
-                          ),
-                        ),
+                        onChanged: (customizationItemId) {
+                          onCustomizationChanged(productCustomizationId: id, newCustomizationItemId: customizationItemId!);
+                        },
                       );
                     },
                     cupSizes: (id, description, sizes) {
                       return DropDownButtonFormItem(
                         title: 'Size',
-                        value: order.customizations.firstWhere((orderCustomization) => orderCustomization.customizationId == id).customizationItemId,
+                        value: getFirstCustomizationItemIdForCustomizationId(order, id),
                         items: sizes.map((size) => DropdownMenuItem(value: size.id, child: Text(size.name))).toList(),
-                        onChanged: (customizationItemId) => bloc.add(
-                          ProductEvent.customizationChanged(
-                            productCustomizationId: id,
-                            newCustomizationItemId: customizationItemId!,
-                          ),
-                        ),
+                        onChanged: (customizationItemId) {
+                          onCustomizationChanged(productCustomizationId: id, newCustomizationItemId: customizationItemId!);
+                        },
                       );
                     },
                   );
@@ -254,13 +267,13 @@ class DropDownButtonFormItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: <Widget>[
-        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF223730))),
+        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kDarkGreenColor)),
         const Spacer(),
         CardFormItem(
           child: SizedBox(
             height: 36,
             child: DropdownButton(
-              style: DefaultTextStyle.of(context).style.copyWith(color: const Color(0xFF223730), fontSize: 16),
+              style: DefaultTextStyle.of(context).style.copyWith(color: kDarkGreenColor, fontSize: 16),
               items: items,
               onChanged: onChanged,
               value: value,
@@ -355,8 +368,6 @@ enum OrderButtonState {
   collapsed,
 }
 
-typedef OrderButtonStateCallback = void Function(OrderButtonState state);
-
 class _OrderButton extends StatefulWidget {
   const _OrderButton({
     Key? key,
@@ -407,6 +418,7 @@ class _OrderButtonState extends State<_OrderButton> with TickerProviderStateMixi
   @override
   void dispose() {
     _sizeController.dispose();
+    _tapController.dispose();
     super.dispose();
   }
 
@@ -468,12 +480,13 @@ class _OrderValueText {
   _OrderValueText({
     required this.currency,
     required this.value,
-  });
+  })  : integer = value.truncate().toString(),
+        decimals = ((value - value.truncate()) * 100).truncate().toString().padRight(2, '0');
 
   final String currency;
   final double value;
-  String get integer => value.truncate().toString();
-  String get decimals => ((value - value.truncate()) * 100).truncate().toString().padRight(2, '0');
+  final String integer;
+  final String decimals;
 }
 
 class _OrderButtonPainter extends CustomPainter {
@@ -580,6 +593,7 @@ class _OrderButtonPainter extends CustomPainter {
   }
 }
 
+// TODO: Extract into RenderObject
 class _OrderButtonClipper extends CustomClipper<Path> {
   _OrderButtonClipper({
     required this.plateauHeight,
